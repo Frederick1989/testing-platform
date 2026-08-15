@@ -10,13 +10,17 @@ interface RiskItem {
   items?: { title?: string; story?: string; criterion?: string; azure_id?: string }[];
 }
 
+interface RisksResponse {
+  items: RiskItem[];
+}
+
 export default function RisksPage() {
-  const { data, error, loading } = useApi<RiskItem[]>('/risks');
+  const { data, error, loading } = useApi<RisksResponse>('/risks');
 
   if (loading) return <Page title="Risks"><Loading /></Page>;
   if (error) return <Page title="Risks"><ErrorBanner message={error} /></Page>;
 
-  const risks = data || [];
+  const risks = data?.items || [];
   const sevColor: Record<string, string> = {
     CRITICAL: 'bg-red-600 text-white',
     HIGH: 'bg-red-100 text-red-800',
