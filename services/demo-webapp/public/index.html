@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Weather Demo — UAT Platform</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h1>Weather Demo</h1>
+      <p class="tagline">A sample application under test for the UAT Test Intelligence platform.</p>
+    </header>
+
+    <section class="search">
+      <form id="search-form" autocomplete="off">
+        <input id="city" type="text" placeholder="Enter a city, e.g. London" aria-label="City">
+        <button type="submit">Search</button>
+      </form>
+      <p id="error" class="error" role="alert" hidden></p>
+    </section>
+
+    <section id="current" class="card" hidden>
+      <h2 id="city-name"></h2>
+      <div class="current-grid">
+        <div class="big"><span id="condition"></span></div>
+        <div class="big"><span id="temperature"></span></div>
+        <dl>
+          <dt>Feels like</dt><dd id="feels-like"></dd>
+          <dt>Humidity</dt><dd id="humidity"></dd>
+          <dt>Wind</dt><dd id="wind"></dd>
+          <dt>Pressure</dt><dd id="pressure"></dd>
+        </dl>
+      </div>
+    </section>
+
+    <section id="forecast" hidden>
+      <h2>5-day forecast</h2>
+      <div id="forecast-list" class="forecast-list"></div>
+    </section>
+
+    <footer class="footer">UAT Test Intelligence Platform demo — contains intentional defects for UAT discovery.</footer>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

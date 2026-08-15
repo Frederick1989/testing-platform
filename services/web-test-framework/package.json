@@ -1,0 +1,14 @@
+{
+  "name": "web-test-framework",
+  "version": "1.0.0",
+  "description": "Playwright test framework for the UAT platform (runner :6000, reports :6001)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "@playwright/test": "^1.44.1"
+  }
+}

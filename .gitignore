@@ -1,0 +1,43 @@
+# Environment / secrets
+.env
+*.env.local
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+dist/
+.browsers/
+test-results/
+
+# Runtime data / artifacts
+reports/generated/*
+!reports/generated/.gitkeep
+reports/runs/
+**/reports/runs/
+**/reports/generated/**
+!**/reports/generated/.gitkeep
+**/reports/api-run-*
+**/reports/web-run-*
+**/reports/last/
+**/_artifacts/
+backups/
+*.log
+*.dump
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store

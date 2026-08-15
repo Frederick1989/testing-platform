@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{ company_name }} — UAT Report</title>
+<style>
+  :root {
+    --primary: {{ primary_color or '#0f4c81' }};
+    --secondary: {{ secondary_color or '#6c757d' }};
+  }
+  * { box-sizing: border-box; }
+  body { font-family: "DejaVu Sans", Arial, sans-serif; color: #1f2937; margin: 0; font-size: 12px; line-height: 1.5; }
+  .page { padding: 28px 36px; }
+  header { border-bottom: 3px solid var(--primary); padding-bottom: 14px; margin-bottom: 20px; }
+  header h1 { margin: 0 0 4px; color: var(--primary); font-size: 22px; }
+  header .sub { color: var(--secondary); font-size: 12px; }
+  .logo { float: right; max-height: 48px; }
+  h2 { color: var(--primary); font-size: 15px; border-left: 4px solid var(--primary); padding-left: 8px; margin: 26px 0 10px; }
+  h3 { font-size: 13px; margin: 16px 0 6px; }
+  table { width: 100%; border-collapse: collapse; margin: 6px 0 12px; }
+  th, td { border: 1px solid #e5e7eb; padding: 5px 8px; text-align: left; vertical-align: top; }
+  th { background: var(--primary); color: #fff; font-weight: 600; }
+  tr:nth-child(even) td { background: #f9fafb; }
+  .cards { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 14px; }
+  .card { flex: 1 1 180px; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px 12px; text-align: center; }
+  .card .value { font-size: 22px; font-weight: 700; color: var(--primary); }
+  .card .label { color: var(--secondary); font-size: 11px; }
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 10px; color: #fff; }
+  .b-pass { background: #16a34a; } .b-fail { background: #dc2626; } .b-skip { background: #6b7280; }
+  .b-flaky { background: #d97706; } .b-error { background: #7f1d1d; } .b-blocked { background: #92400e; }
+  .sev-CRITICAL { background: #7f1d1d; } .sev-HIGH { background: #dc2626; }
+  .sev-MEDIUM { background: #d97706; } .sev-LOW { background: #2563eb; }
+  .gate-on { color: #16a34a; } .gate-off { color: #dc2626; }
+  ul { margin: 4px 0 10px; padding-left: 18px; }
+  footer { margin-top: 28px; padding-top: 10px; border-top: 1px solid #e5e7eb; color: var(--secondary); font-size: 10px; text-align: center; }
+  .two-col { display: flex; gap: 24px; } .two-col > div { flex: 1; }
+  .metric-line { display: flex; justify-content: space-between; border-bottom: 1px dotted #e5e7eb; padding: 2px 0; }
+</style>
+</head>
+<body>
+<div class="page">
+<header>
+  {% if logo %}<img class="logo" src="{{ logo }}" alt="logo">{% endif %}
+  <h1>UAT Test Intelligence Report</h1>
+  <div class="sub">{{ company_name }} — {{ sprint.name or 'All sprints' }} · Generated {{ generated_at.strftime('%d %b %Y %H:%M UTC') }}</div>
+</header>
+
+{% if ready_stories %}
+<h2>UAT Readiness</h2>
+<p>Stories meeting all readiness gates ({{ ready_stories|length }}):</p>
+<table>
+  <thead><tr><th>ID</th><th>Title</th><th>Iteration</th></tr></thead>
+  <tbody>
+    {% for s in ready_stories %}
+    <tr><td>{{ s.azure_id }}</td><td>{{ s.title }}</td><td>{{ s.iteration_name or '—' }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<h2>Executive Summary</h2>
+<div class="cards">
+  <div class="card"><div class="value">{{ coverage.requirement|default(0) }}%</div><div class="label">Requirement Coverage</div></div>
+  <div class="card"><div class="value">{{ coverage.story|default(0) }}%</div><div class="label">Story Coverage</div></div>
+  <div class="card"><div class="value">{{ coverage.automation|default(0) }}%</div><div class="label">Automation</div></div>
+  <div class="card"><div class="value">{{ coverage.execution|default(0) }}%</div><div class="label">Execution</div></div>
+  <div class="card"><div class="value">{{ test_health.pass_rate|default(0) }}%</div><div class="label">Pass Rate</div></div>
+  <div class="card"><div class="value">{{ defects.open|default(0) }}</div><div class="label">Open Defects</div></div>
+</div>
+
+{% if sprint %}
+<h2>Sprint</h2>
+<div class="two-col">
+  <div>
+    <div class="metric-line"><span>Iteration</span><strong>{{ sprint.name or '—' }}</strong></div>
+    <div class="metric-line"><span>Committed / Completed</span><strong>{{ sprint.committed }} / {{ sprint.completed }}</strong></div>
+    <div class="metric-line"><span>Remaining</span><strong>{{ sprint.remaining }}</strong></div>
+    <div class="metric-line"><span>Velocity</span><strong>{{ sprint.velocity }}</strong></div>
+  </div>
+  <div>
+    <div class="metric-line"><span>Cycle time</span><strong>{{ sprint.cycle_time_hours or '—' }}h</strong></div>
+    <div class="metric-line"><span>Lead time</span><strong>{{ sprint.lead_time_hours or '—' }}h</strong></div>
+    <div class="metric-line"><span>State</span><strong>{{ sprint.state }}</strong></div>
+    <div class="metric-line"><span>Start → Finish</span><strong>{{ (sprint.start_date or '—') }} → {{ (sprint.finish_date or '—') }}</strong></div>
+  </div>
+</div>
+{% endif %}
+
+<h2>Test Execution &amp; Health</h2>
+<div class="cards">
+  <div class="card"><div class="value">{{ test_health.total|default(0) }}</div><div class="label">Results</div></div>
+  <div class="card"><div class="value">{{ test_health.failure_rate|default(0) }}%</div><div class="label">Failure Rate</div></div>
+  <div class="card"><div class="value">{{ test_health.flakiness_rate|default(0) }}%</div><div class="label">Flakiness</div></div>
+  <div class="card"><div class="value">{{ test_health.avg_duration_ms|default(0)|int }}</div><div class="label">Avg Duration (ms)</div></div>
+</div>
+
+<h2>Regression</h2>
+<div class="two-col">
+  <div>
+    <h3>New Failures ({{ regression.counts.new_failures|default(0) }})</h3>
+    <ul>{% for t in regression.new_failures %}<li>{{ t.title }}</li>{% else %}<li>None</li>{% endfor %}</ul>
+  </div>
+  <div>
+    <h3>Recovered ({{ regression.counts.recovered|default(0) }}) / Repeated ({{ regression.counts.repeated_failures|default(0) }})</h3>
+    <ul>
+      {% for t in regression.recovered %}<li>{{ t.title }}</li>{% else %}<li>None recovered</li>{% endfor %}
+      {% for t in regression.repeated_failures %}<li>{{ t.title }}</li>{% endfor %}
+    </ul>
+  </div>
+</div>
+
+{% if flaky.tests %}
+<h2>Flaky Tests ({{ flaky.count }})</h2>
+<table>
+  <thead><tr><th>Test</th><th>Runs</th><th>Failures</th></tr></thead>
+  <tbody>
+    {% for t in flaky.tests %}
+    <tr><td>{{ t.title }}</td><td>{{ t.total_runs }}</td><td>{{ t.failures }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<h2>Defects</h2>
+<div class="cards">
+  <div class="card"><div class="value">{{ defects.total|default(0) }}</div><div class="label">Total</div></div>
+  <div class="card"><div class="value">{{ defects.critical|default(0) }}</div><div class="label">Critical</div></div>
+  <div class="card"><div class="value">{{ defects.blockers|default(0) }}</div><div class="label">Blockers</div></div>
+  <div class="card"><div class="value">{{ defects.mttr_hours or '—' }}</div><div class="label">MTTR (h)</div></div>
+  <div class="card"><div class="value">{{ defects.reopen_rate|default(0) }}%</div><div class="label">Reopen Rate</div></div>
+  <div class="card"><div class="value">{{ defects.defect_density|default(0) }}</div><div class="label">Density / Story</div></div>
+</div>
+{% if defects.by_severity %}
+<table>
+  <thead><tr><th>Severity</th><th>Count</th></tr></thead>
+  <tbody>{% for k, v in defects.by_severity.items() %}<tr><td>{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}</tbody>
+</table>
+{% endif %}
+
+{% if risks %}
+<h2>Risks</h2>
+<table>
+  <thead><tr><th>Severity</th><th>Category</th><th>Risk</th></tr></thead>
+  <tbody>
+    {% for r in risks %}
+    <tr><td><span class="badge sev-{{ r.severity }}">{{ r.severity }}</span></td><td>{{ r.category }}</td><td>{{ r.title }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% if matrix %}
+<h2>Test Matrix ({{ matrix|length }} stories)</h2>
+{% for row in matrix %}
+<h3>#{{ row.azure_id }} — {{ row.title }} <span style="color:{{ primary_color }}">({{ row.coverage }}% AC covered)</span></h3>
+<table>
+  <thead><tr><th>Acceptance Criterion</th><th>Status</th><th>Test Case</th><th>Latest Result</th><th>Status</th></tr></thead>
+  <tbody>
+    {% for ac in row.acceptance_criteria %}
+      {% if ac.test_cases %}
+        {% for tc in ac.test_cases %}
+        <tr>
+          {% if loop.first %}<td rowspan="{{ ac.test_cases|length }}">{{ ac.text }}</td><td rowspan="{{ ac.test_cases|length }}">{{ ac.status }}</td>{% endif %}
+          <td>{{ tc.title }}</td>
+          <td>{{ tc.latest.title if tc.latest else 'Not executed' }}</td>
+          <td>{% if tc.latest %}<span class="badge b-{{ tc.latest.status|lower }}">{{ tc.latest.status }}</span>{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      {% else %}
+        <tr><td>{{ ac.text }}</td><td>{{ ac.status }}</td><td colspan="3">—</td></tr>
+      {% endif %}
+    {% endfor %}
+  </tbody>
+</table>
+{% endfor %}
+{% endif %}
+
+<footer>{{ footer }} · Generated {{ generated_at.strftime('%Y-%m-%d %H:%M') }}</footer>
+</div>
+</body>
+</html>

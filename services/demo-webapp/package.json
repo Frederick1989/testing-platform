@@ -1,0 +1,12 @@
+{
+  "name": "weather-demo-webapp",
+  "version": "1.0.0",
+  "description": "Demo weather web application under test (port 8000)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
