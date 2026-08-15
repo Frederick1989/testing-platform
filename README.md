@@ -8,6 +8,23 @@ reports, and notifies on meaningful events.
 
 ![Architecture summary](docs/architecture.md)
 
+## Repository strategy
+
+This repo (`testing-platform`) is **public** and currently operates only against
+demo applications (weather mock, demo web app). All data in `docs/`, seed data
+and fixtures is fictitious.
+
+When the platform is used against **real client applications**, do NOT add
+client details, NDA-covered material or corporate IP here. Instead create a
+separate **private** repo `testing-platform-private` for client-specific
+config, credentials and data, and keep both repositories cloned locally:
+
+```text
+~/workspace/
+  uat-test-intelligence/    # public: platform code, demo data
+  testing-platform-private/ # private: client details, config, secrets
+```
+
 ## Repository layout
 
 ```text
