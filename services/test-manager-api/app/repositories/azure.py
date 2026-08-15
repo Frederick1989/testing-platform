@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.types import WorkItemType
@@ -124,6 +124,15 @@ def upsert_acceptance_criteria(
     for extra in existing[len(texts):]:
         extra.is_active = False
     return rows
+
+
+def count_acceptance_criteria(session: Session, work_item_id: int) -> int:
+    return session.scalar(
+        select(func.count(AcceptanceCriterion.id)).where(
+            AcceptanceCriterion.work_item_id == work_item_id,
+            AcceptanceCriterion.is_active.is_(True),
+        )
+    ) or 0
 
 
 def upsert_comment(session: Session, comment: dict) -> AzureComment:

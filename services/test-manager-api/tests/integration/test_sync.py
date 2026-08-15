@@ -140,3 +140,66 @@ def test_story_type_is_configurable(session, monkeypatch):
     azure_ids = {s.azure_id for s in stories}
     assert 4001 in azure_ids
     assert 4002 not in azure_ids
+
+
+def test_closed_date_reads_process_specific_field(session, monkeypatch):
+    monkeypatch.setattr(settings, "azure_closed_date_field", "Microsoft.VSTS.Common.ClosedDate")
+    item = _item(5001, wtype="Issue", fields={
+        "Microsoft.VSTS.Common.ClosedDate": "2026-01-05T00:00:00Z",
+    })
+    client = FakeAzureClient([item])
+
+    _run(sync_svc.sync_work_items(session, client))
+    session.commit()
+
+    defect = session.query(Defect).filter(Defect.azure_id == 5001).one()
+    assert defect.closed_at is not None
+
+
+def test_derive_criteria_from_child_tasks(session, monkeypatch):
+    monkeypatch.setattr(settings, "azure_story_type", "Epic")
+    epic = _item(6001, wtype="Epic")
+    task1 = _item(6002, wtype="Task", fields={
+        "System.Parent": 6001, "System.Title": "Verify login flow",
+    })
+    task2 = _item(6003, wtype="Task", fields={
+        "System.Parent": 6001, "System.Title": "Check error messages",
+    })
+    client = FakeAzureClient([epic, task1, task2])
+
+    _run(sync_svc.sync_work_items(session, client))
+    session.commit()
+
+    epic_row = session.query(WorkItem).filter(WorkItem.azure_id == 6001).one()
+    acs = session.query(AcceptanceCriterion).filter(
+        AcceptanceCriterion.work_item_id == epic_row.id
+    ).all()
+    assert {ac.text for ac in acs} == {"Verify login flow", "Check error messages"}
+
+
+def test_missing_field_parsing():
+    from app.adapters.azure.client import _missing_field
+
+    assert (
+        _missing_field("Azure DevOps API error 400: TF51535: Cannot find field System.ClosedDate.")
+        == "System.ClosedDate"
+    )
+    assert _missing_field("some other error") is None
+
+
+def test_work_item_fields_excludes_empty_ac_field(monkeypatch):
+    from app.adapters.azure.client import AzureDevOpsClient
+
+    monkeypatch.setattr(settings, "azure_acceptance_criteria_field", "  ")
+    fields = AzureDevOpsClient._work_item_fields()
+    assert "" not in fields
+    assert "Microsoft.VSTS.Common.AcceptanceCriteria" not in fields
+
+
+def test_basic_process_state_mapping():
+    from app.services.sync import _map_state
+
+    assert _map_state("To Do") == "New"
+    assert _map_state("Doing") == "Active"
+    assert _map_state("Done") == "Closed"
+    assert _map_state("Resolved") == "Resolved"

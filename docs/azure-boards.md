@@ -107,14 +107,22 @@ by hand in Azure — it is built by the platform.
 - Restart the backend (settings are read at startup), then trigger a sync:
   `POST /api/v1/azure/sync` with `Authorization: Bearer <API_TOKEN>`.
 
-## 8. Open items / known gaps
+## 8. Behavior notes / known gaps
 
-- **Basic process lacks a built-in AC field.** If staying on Basic without a
-  custom field, point `AZURE_ACCEPTANCE_CRITERIA_FIELD` at a custom field you
-  add to the process (e.g. a "Acceptance Criteria" text field). Deriving
-  criteria from child `Task`s is not implemented.
-- **Defect state mapping.** Azure states map directly onto the defects table
-  (`New`/`Active`/`Resolved`/`Closed`/`Removed`); Azure has no reopen count, so
-  `reopened_count` stays 0 and is not part of Azure-fed metrics.
+- **Missing fields are auto-dropped.** The sync requests a broad field set;
+  if a project's process lacks a field (e.g. Basic has no `System.ClosedDate`,
+  `System.Url`, `Severity` or AC field), that field is silently dropped and the
+  sync continues.
+- **Basic process ACs.** Basic has no AC field, so criteria are derived from a
+  story's child `Task`/`Test Case` titles when the AC field is empty/absent.
+  To supply your own, add a custom text field and point
+  `AZURE_ACCEPTANCE_CRITERIA_FIELD` at it.
+- **State mapping.** Basic Kanban states map to platform states so metrics stay
+  correct: `To Do` → `New`, `Doing`/`In Progress` → `Active`, `Done` → `Closed`.
+  Azure has no reopen count, so `reopened_count` stays 0.
+- **Defect severity.** Basic has no severity field, so synced defects default to
+  `MEDIUM`; severity only reflects demo data until a custom severity field is
+  configured.
 - **Demo data vs real sync.** Until a real sync runs, dashboards show the demo
-  seed. `POST /api/v1/azure/sync` replaces demo content with ADO data.
+  seed. `POST /api/v1/azure/sync` upserts ADO work items/defects by Azure ID
+  (demo rows with distinct IDs persist until removed).

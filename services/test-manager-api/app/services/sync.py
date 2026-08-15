@@ -53,7 +53,12 @@ def _work_item_to_model(client: AzureClientBase, raw: dict[str, Any], *, now: da
             _parse_dt(fields.get("Microsoft.VSTS.Common.ResolvedDate"))
             or _parse_dt(fields.get("System.ClosedDate"))
         ),
-        "closed_at": _parse_dt(fields.get("System.ClosedDate")),
+        "closed_at": (
+            _parse_dt(fields.get(settings.azure_closed_date_field))
+            if settings.azure_closed_date_field
+            else _parse_dt(fields.get("System.ClosedDate"))
+            or _parse_dt(fields.get("Microsoft.VSTS.Common.ClosedDate"))
+        ),
         "tags": tags,
         "url": fields.get("System.Url", ""),
         "parent_azure_id": fields.get("System.Parent"),
@@ -79,6 +84,20 @@ def _map_severity(raw: str) -> str:
     return "MEDIUM"
 
 
+def _map_state(raw: str) -> str:
+    """Normalize Azure states (including Basic-process Kanban states) to the
+    platform defect states so open/closed metrics stay correct."""
+    text = (raw or "").strip()
+    if not text:
+        return "New"
+    return {
+        "To Do": "New",
+        "Doing": "Active",
+        "In Progress": "Active",
+        "Done": "Closed",
+    }.get(text, text)
+
+
 def _defect_from_model(model: dict[str, Any]) -> dict:
     return {
         "azure_id": model["azure_id"],
@@ -86,7 +105,7 @@ def _defect_from_model(model: dict[str, Any]) -> dict:
         "description": model["description"],
         "severity": _map_severity(model["severity"]),
         "priority": "",
-        "state": model["state"],
+        "state": _map_state(model["state"]),
         "assigned_to": model["assigned_to"],
         "iteration_name": model["iteration_name"],
         "story_work_item_id": model["parent_azure_id"],
@@ -186,6 +205,7 @@ async def sync_work_items(session: Session, client: AzureClientBase, *, only: li
     raw_items = await client.query_work_items(wiql)
     defect_types = _defect_type_names()
     count = 0
+    synced: list[tuple[Any, dict[str, Any]]] = []
     for raw in raw_items:
         if raw.get("id") is None:
             continue
@@ -210,8 +230,35 @@ async def sync_work_items(session: Session, client: AzureClientBase, *, only: li
             if model["iteration_name"]:
                 iteration = az_repo.get_iteration_by_name(session, model["iteration_name"])
                 defect_row.iteration_id = iteration.id if iteration else None
+        synced.append((row, model))
         count += 1
+    if settings.azure_derive_acceptance_criteria_from_tasks:
+        _derive_criteria_from_tasks(session, synced)
     return count
+
+
+_CRITERIA_SOURCE_TYPES = ("Task", "Test Case")
+
+
+def _derive_criteria_from_tasks(session: Session, synced: list[tuple[Any, dict[str, Any]]]) -> int:
+    """For stories with no AC field, derive criteria from their child work items
+    (Task / Test Case titles)."""
+    by_parent: dict[int, list[str]] = {}
+    for _row, model in synced:
+        parent = model.get("parent_azure_id")
+        if model["type"] in _CRITERIA_SOURCE_TYPES and parent is not None and model["title"]:
+            by_parent.setdefault(parent, []).append(model["title"])
+    added = 0
+    for row, model in synced:
+        if model["type"] != settings.azure_story_type:
+            continue
+        if az_repo.count_acceptance_criteria(session, row.id):
+            continue
+        titles = by_parent.get(model["azure_id"])
+        if titles:
+            az_repo.upsert_acceptance_criteria(session, row.id, titles[:30])
+            added += 1
+    return added
 
 
 async def sync_pull_requests(session: Session, client: AzureClientBase) -> int:

@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     azure_defect_types: str = "Bug,Issue"
     # field that holds acceptance criteria (Basic process has no built-in field)
     azure_acceptance_criteria_field: str = "Microsoft.VSTS.Common.AcceptanceCriteria"
+    # field that holds the closed date (Basic process uses Microsoft.VSTS.Common.ClosedDate)
+    azure_closed_date_field: str = ""
+    # derive criteria from child Task titles when a story has no AC field
+    azure_derive_acceptance_criteria_from_tasks: bool = True
 
     # --- llm ---
     llm_provider: str = "none"

@@ -143,17 +143,38 @@ class AzureDevOpsClient(AzureClientBase):
         if not ids:
             return []
         url = self._url("wit/workitemsbatch")
-        payload = {"ids": ids[:199], "fields": [
+        fields = self._work_item_fields()
+        attempts = 0
+        while True:
+            payload = {"ids": ids[:199], "fields": fields}
+            try:
+                resp = await self._request("POST", url, json=payload)
+                return resp.json().get("value", [])
+            except BadRequestError as exc:
+                missing = _missing_field(str(exc))
+                if missing is None or missing not in fields or attempts >= len(fields):
+                    raise
+                fields = [f for f in fields if f != missing]
+                attempts += 1
+
+    @staticmethod
+    def _work_item_fields() -> list[str]:
+        base = [
             "System.Id", "System.WorkItemType", "System.Title", "System.Description",
-            "Microsoft.VSTS.Common.AcceptanceCriteria", "Microsoft.VSTS.Common.Severity",
-            "Microsoft.VSTS.Common.ResolvedDate",
-            "System.State",
+            "Microsoft.VSTS.Common.Severity",
+            "Microsoft.VSTS.Common.ResolvedDate", "System.State",
             "System.AssignedTo", "System.IterationPath", "System.AreaPath",
             "System.CreatedDate", "System.ChangedDate", "System.ClosedDate",
-            "System.Tags", "System.Parent", "System.CommentCount", "System.Url",
-        ]}
-        resp = await self._request("POST", url, json=payload)
-        return resp.json().get("value", [])
+            "Microsoft.VSTS.Common.ClosedDate", "System.Tags", "System.Parent",
+            "System.CommentCount", "System.Url",
+        ]
+        ac = settings.azure_acceptance_criteria_field.strip()
+        if ac:
+            base.append(ac)
+        closed = settings.azure_closed_date_field.strip()
+        if closed and closed not in base:
+            base.append(closed)
+        return base
 
     async def get_work_item(self, work_item_id: int) -> dict[str, Any]:
         url = self._url(f"wit/workitems/{work_item_id}")
@@ -209,6 +230,12 @@ def _safe_azure_error(resp: httpx.Response) -> str:
     # defensive redaction in case Azure echoes query params
     msg = re.sub(r"(pat|authorization|token)=[^&\s]+", r"\1=REDACTED", msg, flags=re.I)
     return msg[:1000]
+
+
+def _missing_field(error: str) -> str | None:
+    """Return the field name from 'TF51535: Cannot find field <name>' errors."""
+    m = re.search(r"Cannot find field ([\w./-]+)", error)
+    return m.group(1).rstrip(".") if m else None
 
 
 def _extract_field(fields: Mapping[str, Any], name: str, default: Any = "") -> Any:
