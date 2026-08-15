@@ -146,5 +146,6 @@ Backups are never committed (see `.gitignore`).
 ## Documentation
 
 See `docs/` — in particular `docs/architecture.md`, `docs/security.md` and
-`docs/deployment.md` for deployment, and `docs/test-strategy.md` for how the
+`docs/deployment.md` for deployment, `docs/azure-boards.md` for configuring
+Azure Boards to feed the metrics, and `docs/test-strategy.md` for how the
 platform tests itself.
