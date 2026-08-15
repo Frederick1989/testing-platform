@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.azure import Iteration, WorkItem
+from app.config import settings
 from app.repositories import azure as az_repo
 
 _ACTIVE_STATES = ("New", "Active", "Approved", "In Progress", "Committed")
@@ -37,7 +38,7 @@ def sprint_metrics(session: Session, iteration: Iteration | None) -> dict[str, A
         session.scalars(
             select(WorkItem).where(
                 WorkItem.iteration_id == iteration.id,
-                WorkItem.type == "User Story",
+                WorkItem.type == settings.azure_story_type,
                 WorkItem.is_active.is_(True),
             )
         )

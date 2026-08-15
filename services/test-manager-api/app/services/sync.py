@@ -8,8 +8,10 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.adapters.azure.client import AzureClientBase, strip_html
+from app.config import settings
 from app.models.azure import AzureSyncLog
 from app.repositories import azure as az_repo
+from app.repositories import tests as tests_repo
 
 logger = logging.getLogger("app.sync")
 
@@ -35,21 +37,67 @@ def _work_item_to_model(client: AzureClientBase, raw: dict[str, Any], *, now: da
         "type": fields.get("System.WorkItemType", ""),
         "title": fields.get("System.Title", ""),
         "description": strip_html(fields.get("System.Description", "") or ""),
-        "acceptance_criteria_raw": strip_html(
-            fields.get("Microsoft.VSTS.Common.AcceptanceCriteria", "") or ""
+        "acceptance_criteria_raw": "\n".join(
+            strip_html(line)
+            for line in str(fields.get(settings.azure_acceptance_criteria_field, "") or "").splitlines()
+            if line.strip()
         ),
         "state": fields.get("System.State", ""),
         "assigned_to": assigned_name,
         "iteration_name": fields.get("System.IterationPath", "").split("\\")[-1],
         "area_path": fields.get("System.AreaPath", ""),
+        "severity": fields.get("Microsoft.VSTS.Common.Severity", ""),
         "created_at": _parse_dt(fields.get("System.CreatedDate")),
         "updated_at": _parse_dt(fields.get("System.ChangedDate")),
+        "resolved_at": (
+            _parse_dt(fields.get("Microsoft.VSTS.Common.ResolvedDate"))
+            or _parse_dt(fields.get("System.ClosedDate"))
+        ),
         "closed_at": _parse_dt(fields.get("System.ClosedDate")),
         "tags": tags,
         "url": fields.get("System.Url", ""),
         "parent_azure_id": fields.get("System.Parent"),
         "comment_count": int(fields.get("System.CommentCount") or 0),
         "last_synced_at": now,
+    }
+
+
+def _defect_type_names() -> set[str]:
+    return {t.strip() for t in settings.azure_defect_types.split(",") if t.strip()}
+
+
+def _map_severity(raw: str) -> str:
+    text = (raw or "").lower()
+    if "critical" in text:
+        return "CRITICAL"
+    if "high" in text:
+        return "HIGH"
+    if "medium" in text:
+        return "MEDIUM"
+    if "low" in text:
+        return "LOW"
+    return "MEDIUM"
+
+
+def _defect_from_model(model: dict[str, Any]) -> dict:
+    return {
+        "azure_id": model["azure_id"],
+        "title": model["title"],
+        "description": model["description"],
+        "severity": _map_severity(model["severity"]),
+        "priority": "",
+        "state": model["state"],
+        "assigned_to": model["assigned_to"],
+        "iteration_name": model["iteration_name"],
+        "story_work_item_id": model["parent_azure_id"],
+        "created_at": model["created_at"],
+        "resolved_at": model["resolved_at"],
+        "closed_at": model["closed_at"],
+        "reopened_count": 0,
+        "is_escaped": False,
+        "tags": model["tags"],
+        "url": model["url"],
+        "last_synced_at": model["last_synced_at"],
     }
 
 
@@ -136,6 +184,7 @@ async def sync_work_items(session: Session, client: AzureClientBase, *, only: li
         f"FROM WorkItems WHERE {type_clause} ORDER BY [System.CreatedDate] DESC"
     )
     raw_items = await client.query_work_items(wiql)
+    defect_types = _defect_type_names()
     count = 0
     for raw in raw_items:
         if raw.get("id") is None:
@@ -154,6 +203,13 @@ async def sync_work_items(session: Session, client: AzureClientBase, *, only: li
         # comments
         if row.comment_count:
             _sync_comments(session, client, row.id, int(raw["id"]))
+        # defect-typed items also land in the defects table (metric pipeline)
+        if model["type"] in defect_types:
+            defect = _defect_from_model(model)
+            defect_row = tests_repo.upsert_defect(session, defect)
+            if model["iteration_name"]:
+                iteration = az_repo.get_iteration_by_name(session, model["iteration_name"])
+                defect_row.iteration_id = iteration.id if iteration else None
         count += 1
     return count
 

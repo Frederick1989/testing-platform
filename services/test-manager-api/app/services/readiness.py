@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.azure import WorkItem
+from app.config import settings
 from app.models.test import Defect, TestResult, TestStoryLink
 
 
@@ -92,7 +93,7 @@ def evaluate_story(session: Session, work_item_pk: int, *,
 def list_ready_stories(session: Session) -> list[dict[str, Any]]:
     stories = session.scalars(
         select(WorkItem)
-        .where(WorkItem.type == "User Story", WorkItem.is_active.is_(True))
+        .where(WorkItem.type == settings.azure_story_type, WorkItem.is_active.is_(True))
         .order_by(WorkItem.azure_id)
     )
     ready: list[dict[str, Any]] = []

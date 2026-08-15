@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models.test import Defect
 
 _OPEN_STATES = ("New", "Active", "Approved")
@@ -75,7 +76,7 @@ def _story_count(session: Session) -> int:
     from app.models.azure import WorkItem
 
     return session.scalar(
-        select(func.count(WorkItem.id)).where(WorkItem.type == "User Story")
+        select(func.count(WorkItem.id)).where(WorkItem.type == settings.azure_story_type)
     ) or 0
 
 

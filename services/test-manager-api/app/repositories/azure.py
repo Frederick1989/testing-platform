@@ -164,13 +164,15 @@ def count_work_items_by_type(session: Session) -> dict[str, int]:
 
 
 def types_for_query(*, stories_only: bool = False) -> list[str]:
+    from app.config import settings
+
     if stories_only:
-        return [WorkItemType.USER_STORY.value]
-    return [
+        return [settings.azure_story_type]
+    types = {
         WorkItemType.EPIC.value,
         WorkItemType.FEATURE.value,
-        WorkItemType.USER_STORY.value,
         WorkItemType.TASK.value,
-        WorkItemType.BUG.value,
-        WorkItemType.ISSUE.value,
-    ]
+        settings.azure_story_type,
+    }
+    types.update(t for t in settings.azure_defect_types.split(",") if t.strip())
+    return sorted(types)

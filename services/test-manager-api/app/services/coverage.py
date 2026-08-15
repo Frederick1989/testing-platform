@@ -12,6 +12,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models.azure import WorkItem
 from app.models.test import (
     AcceptanceCriterion,
@@ -44,7 +45,7 @@ def _stories(session: Session) -> list[WorkItem]:
     return list(
         session.scalars(
             select(WorkItem)
-            .where(WorkItem.type == "User Story", WorkItem.is_active.is_(True))
+            .where(WorkItem.type == settings.azure_story_type, WorkItem.is_active.is_(True))
         )
     )
 

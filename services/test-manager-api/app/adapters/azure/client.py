@@ -145,7 +145,9 @@ class AzureDevOpsClient(AzureClientBase):
         url = self._url("wit/workitemsbatch")
         payload = {"ids": ids[:199], "fields": [
             "System.Id", "System.WorkItemType", "System.Title", "System.Description",
-            "Microsoft.VSTS.Common.AcceptanceCriteria", "System.State",
+            "Microsoft.VSTS.Common.AcceptanceCriteria", "Microsoft.VSTS.Common.Severity",
+            "Microsoft.VSTS.Common.ResolvedDate",
+            "System.State",
             "System.AssignedTo", "System.IterationPath", "System.AreaPath",
             "System.CreatedDate", "System.ChangedDate", "System.ClosedDate",
             "System.Tags", "System.Parent", "System.CommentCount", "System.Url",

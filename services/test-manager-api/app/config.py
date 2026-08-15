@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     azure_comment_on_analysis: bool = False
     azure_git_repo_name: str = ""
     azure_git_remote_url: str = ""
+    # work item types that act as the "story" (drives coverage/readiness/matrix)
+    azure_story_type: str = "User Story"
+    # work item types treated as defects on sync (comma-separated)
+    azure_defect_types: str = "Bug,Issue"
+    # field that holds acceptance criteria (Basic process has no built-in field)
+    azure_acceptance_criteria_field: str = "Microsoft.VSTS.Common.AcceptanceCriteria"
 
     # --- llm ---
     llm_provider: str = "none"

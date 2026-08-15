@@ -112,10 +112,11 @@ def _build(session: Session, story: Any) -> dict[str, Any]:
 
 
 def matrix_for_sprint(session: Session, iteration_name: str | None = None) -> list[dict[str, Any]]:
+    from app.config import settings
     from app.models.azure import WorkItem
 
     stmt = select(WorkItem).where(
-        WorkItem.type == "User Story", WorkItem.is_active.is_(True)
+        WorkItem.type == settings.azure_story_type, WorkItem.is_active.is_(True)
     )
     if iteration_name:
         stmt = stmt.where(WorkItem.iteration_name == iteration_name)

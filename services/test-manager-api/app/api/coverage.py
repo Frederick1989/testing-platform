@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import db
+from app.config import settings
 from app.core.auth import require_token
 from app.services import coverage as coverage_svc
 
@@ -57,7 +58,7 @@ def coverage_by_story(session: Annotated[Session, Depends(db)]) -> dict:
 
     stories = session.scalars(
         select(WorkItem).where(
-            WorkItem.type == "User Story", WorkItem.is_active.is_(True)
+            WorkItem.type == settings.azure_story_type, WorkItem.is_active.is_(True)
         )
     ).all()
     result = []

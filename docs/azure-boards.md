@@ -34,12 +34,20 @@ that the platform reads.
 
 This is the least work and matches the platform exactly.
 
-### Option B — configure the platform for Epic/Issue (code change, not yet built)
+### Option B — configure the platform for Epic/Issue (implemented)
 
-If you cannot change the process, the platform can be extended so the "story"
-role maps to another type (e.g. `Epic` or `Issue`) and acceptance criteria are
-read from a configured field (or derived from child `Task`s). Bugs tracked as
-`Issue` would map to the Defects table. See **§8 – Open items**.
+If you cannot change the process, the platform maps the "story" role to a
+configured type and reads acceptance criteria from a configurable field:
+
+| Setting | Default | Purpose |
+|---|---|---|
+| `AZURE_STORY_TYPE` | `User Story` | Type that drives coverage, readiness, matrix, velocity |
+| `AZURE_DEFECT_TYPES` | `Bug,Issue` | Types ingested into the defects table on sync |
+| `AZURE_ACCEPTANCE_CRITERIA_FIELD` | `Microsoft.VSTS.Common.AcceptanceCriteria` | Field parsed for criteria (one per line) |
+
+For a Basic-process project set `AZURE_STORY_TYPE=Epic` (or `Issue`) and, unless
+you add a custom AC field, define where criteria come from. Bugs tracked as
+`Issue` are ingested as defects automatically — see §8.
 
 ## 3. Acceptance criteria (drives coverage)
 
@@ -101,13 +109,12 @@ by hand in Azure — it is built by the platform.
 
 ## 8. Open items / known gaps
 
-- **Bug → Defect ingestion is not wired yet.** The Defects table (defect
-  metrics, MTTR, aging, severity) is only populated by the demo seed today.
-  Azure `Bug`/`Issue` items sync as work items but do not yet land in the
-  defects table.
-- **Configurable story type.** `User Story` is hard-coded as the story type.
-  Supporting `Epic`/`Issue` as the story role (Option B above) requires a small
-  code change (`AZURE_STORY_TYPE` + configurable AC field/source).
-- **Basic process lacks an AC field.** If staying on Basic, the acceptance
-  criteria source must be defined (custom field or child `Task`s) — needs the
-  configurable-AC work above.
+- **Basic process lacks a built-in AC field.** If staying on Basic without a
+  custom field, point `AZURE_ACCEPTANCE_CRITERIA_FIELD` at a custom field you
+  add to the process (e.g. a "Acceptance Criteria" text field). Deriving
+  criteria from child `Task`s is not implemented.
+- **Defect state mapping.** Azure states map directly onto the defects table
+  (`New`/`Active`/`Resolved`/`Closed`/`Removed`); Azure has no reopen count, so
+  `reopened_count` stays 0 and is not part of Azure-fed metrics.
+- **Demo data vs real sync.** Until a real sync runs, dashboards show the demo
+  seed. `POST /api/v1/azure/sync` replaces demo content with ADO data.

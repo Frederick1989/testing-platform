@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models.azure import WorkItem
 from app.models.test import (
     AcceptanceCriterion,
@@ -82,7 +83,7 @@ def compute_risks(session: Session) -> list[dict[str, Any]]:
 
     # 4. stories without execution
     stories = session.scalars(
-        select(WorkItem).where(WorkItem.type == "User Story", WorkItem.is_active.is_(True))
+        select(WorkItem).where(WorkItem.type == settings.azure_story_type, WorkItem.is_active.is_(True))
     ).all()
     unexecuted = []
     for story in stories:
