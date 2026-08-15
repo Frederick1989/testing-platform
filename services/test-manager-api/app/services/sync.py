@@ -5,11 +5,13 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.adapters.azure.client import AzureClientBase, strip_html
 from app.config import settings
-from app.models.azure import AzureSyncLog
+from app.models.azure import AzureSyncLog, Iteration, WorkItem
+from app.models.test import Defect
 from app.repositories import azure as az_repo
 from app.repositories import tests as tests_repo
 
@@ -168,28 +170,51 @@ async def sync_iterations(session: Session, client: AzureClientBase) -> int:
     for item in raw:
         azure_id = str(item.get("id"))
         name = item.get("name", "")
-        # name of the "Current" iteration should be its path leaf, but that is a
-        # team-level concept; store the resolved leaf if possible.
-        is_current = bool(current_path and item.get("path") == current_path)
+        attributes = item.get("attributes", {}) if isinstance(item.get("attributes"), dict) else {}
+        timeframe = str(attributes.get("timeFrame", "")).capitalize()
+        # Azure marks the current sprint via timeFrame; fall back to the
+        # "Current"-named placeholder when the attribute is absent.
+        is_current = timeframe == "Current" or bool(
+            current_path and item.get("path") == current_path
+        )
         az_repo.upsert_iteration(
             session,
             {
                 "azure_id": azure_id,
                 "name": name,
                 "path": item.get("path", ""),
-                "state": item.get("attributes", {}).get("timeFrame", "")
-                if isinstance(item.get("attributes"), dict) else "",
-                "start_date": _parse_dt(item.get("attributes", {}).get("startDate"))
-                if isinstance(item.get("attributes"), dict) else None,
-                "finish_date": _parse_dt(item.get("attributes", {}).get("finishDate"))
-                if isinstance(item.get("attributes"), dict) else None,
+                "state": timeframe,
+                "start_date": _parse_dt(attributes.get("startDate")),
+                "finish_date": _parse_dt(attributes.get("finishDate")),
                 "is_current": is_current,
                 "url": item.get("url", ""),
                 "last_synced_at": now,
             },
         )
         count += 1
+    _prune_iterations(session, {str(item.get("id")) for item in raw})
     return count
+
+
+def _prune_iterations(session: Session, azure_ids: set[str]) -> int:
+    """Delete iterations that no longer exist in Azure (e.g. demo sprints)."""
+    if not azure_ids:
+        return 0
+    stale = list(
+        session.scalars(select(Iteration).where(Iteration.azure_id.notin_(azure_ids)))
+    )
+    if not stale:
+        return 0
+    stale_ids = [i.id for i in stale]
+    session.query(WorkItem).filter(WorkItem.iteration_id.in_(stale_ids)).update(
+        {"iteration_id": None}, synchronize_session=False
+    )
+    session.query(Defect).filter(Defect.iteration_id.in_(stale_ids)).update(
+        {"iteration_id": None}, synchronize_session=False
+    )
+    for row in stale:
+        session.delete(row)
+    return len(stale)
 
 
 async def sync_work_items(session: Session, client: AzureClientBase, *, only: list[str] | None = None) -> int:
