@@ -15,15 +15,19 @@ demo applications (weather mock, demo web app). All data in `docs/`, seed data
 and fixtures is fictitious.
 
 When the platform is used against **real client applications**, do NOT add
-client details, NDA-covered material or corporate IP here. Instead create a
-separate **private** repo `testing-platform-private` for client-specific
-config, credentials and data, and keep both repositories cloned locally:
+client details, NDA-covered material or corporate IP here. Instead use the
+separate **private** repo `testing-platform-private` (already created) for
+client-specific config, credentials and data, and keep both repositories
+cloned locally:
 
 ```text
 ~/workspace/
   uat-test-intelligence/    # public: platform code, demo data
-  testing-platform-private/ # private: client details, config, secrets
+  testing-platform-private/ # private (exists): client details, config, secrets
 ```
+
+The private repo is already registered locally as the `private` remote of this
+repository (`git push private <branch>` when you're ready to move).
 
 ## Repository layout
 
