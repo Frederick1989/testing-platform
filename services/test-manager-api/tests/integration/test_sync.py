@@ -179,6 +179,46 @@ def test_derive_criteria_from_child_tasks(session, monkeypatch):
     assert {ac.text for ac in acs} == {"Verify login flow", "Check error messages"}
 
 
+def test_sync_ingests_automation_status_field(session, monkeypatch):
+    monkeypatch.setattr(settings, "azure_automation_status_field", "Custom.AutomationStatus")
+    automated = _item(8001, wtype="Epic", fields={
+        "Custom.AutomationStatus": "Automated",
+    })
+    manual = _item(8002, wtype="Epic", fields={
+        "Custom.AutomationStatus": "Not Automated",
+    })
+    unset = _item(8003, wtype="Epic")
+    client = FakeAzureClient([automated, manual, unset])
+
+    _run(sync_svc.sync_work_items(session, client))
+    session.commit()
+
+    rows = {w.azure_id: w for w in session.query(WorkItem).filter(
+        WorkItem.azure_id.in_([8001, 8002, 8003])
+    ).all()}
+    assert rows[8001].automation_status == "Automated"
+    assert rows[8002].automation_status == "Not Automated"
+    assert rows[8003].automation_status == ""
+
+
+def test_sync_ingests_acceptance_test_required_boolean(session, monkeypatch):
+    monkeypatch.setattr(settings, "azure_acceptance_test_required_field", "Custom.AcceptanceTestRequired")
+    exempt = _item(9001, wtype="Epic", fields={"Custom.AcceptanceTestRequired": False})
+    default = _item(9002, wtype="Epic", fields={"Custom.AcceptanceTestRequired": True})
+    unset = _item(9003, wtype="Epic")
+    client = FakeAzureClient([exempt, default, unset])
+
+    _run(sync_svc.sync_work_items(session, client))
+    session.commit()
+
+    rows = {w.azure_id: w for w in session.query(WorkItem).filter(
+        WorkItem.azure_id.in_([9001, 9002, 9003])
+    ).all()}
+    assert rows[9001].acceptance_test_required is False
+    assert rows[9002].acceptance_test_required is True
+    assert rows[9003].acceptance_test_required is True
+
+
 def test_missing_field_parsing():
     from app.adapters.azure.client import _missing_field
 

@@ -22,6 +22,11 @@ def coverage_summary(session: Annotated[Session, Depends(db)]) -> dict:
     return coverage_svc.summarize(session)
 
 
+@router.get("/capacity")
+def capacity_split(session: Annotated[Session, Depends(db)]) -> dict:
+    return coverage_svc.capacity_split(session)
+
+
 @router.get("/acceptance-criteria")
 def acceptance_criteria(session: Annotated[Session, Depends(db)]) -> dict:
     from sqlalchemy import select
@@ -61,6 +66,9 @@ def coverage_by_story(session: Annotated[Session, Depends(db)]) -> dict:
             WorkItem.type == settings.azure_story_type, WorkItem.is_active.is_(True)
         )
     ).all()
+    from app.repositories import azure as az_repo
+
+    stories = [s for s in stories if az_repo.acceptance_test_required(s)]
     result = []
     for s in stories:
         acs = [a for a in s.acceptance_criteria if a.is_active]

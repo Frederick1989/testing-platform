@@ -44,6 +44,15 @@ class Settings(BaseSettings):
     azure_closed_date_field: str = ""
     # derive criteria from child Task titles when a story has no AC field
     azure_derive_acceptance_criteria_from_tasks: bool = True
+    # custom field that flags whether a story's test effort is automated or manual
+    # (Basic process has no built-in field; create "Automation Status" custom field)
+    azure_automation_status_field: str = "Custom.AutomationStatus"
+    # values the automation status field takes
+    azure_automation_automated_value: str = "Automated"
+    azure_automation_manual_value: str = "Not Automated"
+    # boolean custom field on stories: False marks non-test effort (e.g. environment
+    # setup) that is excluded from coverage; empty/True means AC are required
+    azure_acceptance_test_required_field: str = "Custom.AcceptanceTestRequired"
 
     # --- llm ---
     llm_provider: str = "none"

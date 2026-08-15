@@ -42,12 +42,70 @@ class CoverageSummary:
 
 
 def _stories(session: Session) -> list[WorkItem]:
-    return list(
-        session.scalars(
-            select(WorkItem)
-            .where(WorkItem.type == settings.azure_story_type, WorkItem.is_active.is_(True))
-        )
+    rows = session.scalars(
+        select(WorkItem)
+        .where(WorkItem.type == settings.azure_story_type, WorkItem.is_active.is_(True))
     )
+    # non-test effort (Acceptance Test Required = False) is excluded from coverage
+    from app.repositories import azure as az_repo
+
+    return [w for w in rows if az_repo.acceptance_test_required(w)]
+
+
+def capacity_split(session: Session) -> dict[str, Any]:
+    """Automation vs manual test-effort split, measured as story counts.
+
+    Stories with 'Acceptance Test Required' = False (e.g. environment setup)
+    are reported separately as 'non_test'. Empty/absent automation status
+    counts as manual effort.
+    """
+    from app.repositories import azure as az_repo
+
+    rows = session.scalars(
+        select(WorkItem)
+        .where(WorkItem.type == settings.azure_story_type, WorkItem.is_active.is_(True))
+    )
+    automated = 0
+    manual = 0
+    non_test = 0
+    for story in rows:
+        if not az_repo.acceptance_test_required(story):
+            non_test += 1
+        elif az_repo.automation_status(story) == "automated":
+            automated += 1
+        else:
+            manual += 1
+    total = automated + manual + non_test
+    return {
+        "automated": automated,
+        "manual": manual,
+        "non_test": non_test,
+        "total": total,
+        "automated_pct": round(automated / total * 100, 1) if total else 0.0,
+        "manual_pct": round(manual / total * 100, 1) if total else 0.0,
+        "non_test_pct": round(non_test / total * 100, 1) if total else 0.0,
+    }
+
+
+def automated_stories_missing_ac(session: Session) -> dict[str, Any]:
+    """Stories flagged as automated but with no acceptance criteria attached —
+    a validation gap that blocks automation coverage from being measured."""
+    from app.repositories import azure as az_repo
+
+    rows = session.scalars(
+        select(WorkItem)
+        .where(WorkItem.type == settings.azure_story_type, WorkItem.is_active.is_(True))
+    )
+    missing: list[dict[str, Any]] = []
+    for story in rows:
+        if not az_repo.acceptance_test_required(story):
+            continue
+        if az_repo.automation_status(story) != "automated":
+            continue
+        active_acs = [ac for ac in story.acceptance_criteria if ac.is_active]
+        if not active_acs:
+            missing.append({"id": story.id, "azure_id": story.azure_id, "title": story.title})
+    return {"count": len(missing), "items": missing[:10]}
 
 
 def acceptance_criteria_coverage(session: Session) -> dict[str, Any]:

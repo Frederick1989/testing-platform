@@ -29,6 +29,16 @@ def _parse_dt(value: str | None) -> datetime | None:
         return None
 
 
+def _parse_bool(value: Any) -> bool:
+    """Coerce an Azure boolean custom field to a Python bool.
+    Missing/empty defaults to True (acceptance tests required by default)."""
+    if value is None or value == "":
+        return True
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in ("true", "1", "yes", "on")
+
+
 def _work_item_to_model(client: AzureClientBase, raw: dict[str, Any], *, now: datetime) -> dict:
     fields = raw.get("fields", {})
     assigned = fields.get("System.AssignedTo") or {}
@@ -62,6 +72,10 @@ def _work_item_to_model(client: AzureClientBase, raw: dict[str, Any], *, now: da
             or _parse_dt(fields.get("Microsoft.VSTS.Common.ClosedDate"))
         ),
         "tags": tags,
+        "automation_status": fields.get(settings.azure_automation_status_field, ""),
+        "acceptance_test_required": _parse_bool(
+            fields.get(settings.azure_acceptance_test_required_field)
+        ),
         "url": fields.get("System.Url", ""),
         "parent_azure_id": fields.get("System.Parent"),
         "comment_count": int(fields.get("System.CommentCount") or 0),

@@ -62,6 +62,14 @@ def resolution_times(session: Annotated[Session, Depends(db)]) -> dict:
     return defects_svc.resolution_times(session)
 
 
+@router.get("/resolution")
+def resolution_overview(session: Annotated[Session, Depends(db)]) -> dict:
+    return {
+        "distribution": defects_svc.resolution_distribution(session),
+        "open_aging": defects_svc.open_aging(session),
+    }
+
+
 @router.get("/{defect_id}")
 def get_defect(
     defect_id: int,

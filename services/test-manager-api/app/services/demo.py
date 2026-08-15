@@ -47,6 +47,7 @@ _DEMO_STORIES = [
         "state": "Done",
         "iteration": "Sprint 03",
         "assigned": "Ada Lovelace",
+        "automation_status": "Automated",
     },
     {
         "azure_id": 1235,
@@ -62,6 +63,7 @@ _DEMO_STORIES = [
         "state": "Active",
         "iteration": "Current",
         "assigned": "Grace Hopper",
+        "automation_status": "Automated",
     },
     {
         "azure_id": 1236,
@@ -75,6 +77,7 @@ _DEMO_STORIES = [
         "state": "New",
         "iteration": "Current",
         "assigned": "Ada Lovelace",
+        "automation_status": "Not Automated",
     },
     {
         "azure_id": 1237,
@@ -85,6 +88,19 @@ _DEMO_STORIES = [
         "state": "Done",
         "iteration": "Sprint 02",
         "assigned": "Linus Torvalds",
+        "automation_status": "Not Automated",
+    },
+    {
+        "azure_id": 1238,
+        "type": "User Story",
+        "title": "Environment setup for staging",
+        "description": "Provision and maintain the staging environment (no test output delivered).",
+        "ac": [],
+        "state": "Active",
+        "iteration": "Current",
+        "assigned": "Margaret Hamilton",
+        "automation_status": "Not Automated",
+        "acceptance_test_required": False,
     },
 ]
 
@@ -104,6 +120,9 @@ _DEMO_DEFECTS = [
     {"azure_id": 2005, "title": "Forecast API times out after 10 seconds",
      "severity": Severity.HIGH, "state": DefectState.CLOSED, "story": 1236,
      "created_days_ago": 30, "resolved_days_ago": 22, "reopened": 1},
+    {"azure_id": 2006, "title": "Login returns 500 after password reset",
+     "severity": Severity.LOW, "state": DefectState.RESOLVED, "story": 1234,
+     "created_days_ago": 3, "resolved_days_ago": 1.5},
 ]
 
 _TCS = [
@@ -169,13 +188,21 @@ async def seed_demo_data(session: Session, params: dict[str, Any] | None = None)
                 title=story_data["title"], description=story_data["description"],
                 acceptance_criteria_raw="\n".join(story_data["ac"]),
                 state=story_data["state"], assigned_to=story_data["assigned"],
-                area_path="Demo\\Weather", tags=["demo"],
+                area_path="Demo\\Weather",
+                tags=list(story_data.get("tags", ["demo"])),
+                automation_status=story_data.get("automation_status", ""),
+                acceptance_test_required=story_data.get("acceptance_test_required", True),
                 created_at=_utc_ago(45), updated_at=now, url="", last_synced_at=now,
             )
             session.add(story)
             session.flush()
             story.iteration_id = iterations[story_data["iteration"]].id
             story.iteration_name = story_data["iteration"]
+        else:
+            # keep demo deterministic on re-seed: refresh classification fields
+            story.automation_status = story_data.get("automation_status", "")
+            story.acceptance_test_required = story_data.get("acceptance_test_required", True)
+            story.tags = list(story_data.get("tags", ["demo"]))
         stories[story_data["azure_id"]] = story
 
     # acceptance criteria

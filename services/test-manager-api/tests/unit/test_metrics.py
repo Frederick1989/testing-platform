@@ -114,3 +114,87 @@ def test_results_have_seeded_history(seeded):
     with SessionLocal() as s:
         count = s.scalar(select(func.count(TestResult.id))) or 0
         assert count > 0
+
+
+def test_capacity_split_classifies_effort(seeded):
+    from app.models.azure import WorkItem
+
+    with SessionLocal() as s:
+        split = coverage_svc.capacity_split(s)
+        total = s.scalar(
+            select(func.count(WorkItem.id)).where(
+                WorkItem.type == "User Story", WorkItem.is_active.is_(True)
+            )
+        ) or 0
+        assert split["total"] == total
+        assert split["automated"] + split["manual"] + split["non_test"] == total
+        assert split["automated_pct"] + split["manual_pct"] + split["non_test_pct"] == 100.0
+        # demo stories classify deterministically by automation status / tags
+        by_azure = {w.azure_id: w for w in s.scalars(
+            select(WorkItem).where(WorkItem.azure_id.in_([1234, 1236, 1238]))
+        )}
+        from app.repositories import azure as az_repo
+
+        assert az_repo.automation_status(by_azure[1234]) == "automated"
+        assert az_repo.automation_status(by_azure[1236]) == "manual"
+        assert az_repo.acceptance_test_required(by_azure[1238]) is False
+
+
+def test_non_test_stories_excluded_from_coverage(seeded):
+    from app.models.azure import WorkItem
+
+    with SessionLocal() as s:
+        total_raw = s.scalar(
+            select(func.count(WorkItem.id)).where(
+                WorkItem.type == "User Story", WorkItem.is_active.is_(True)
+            )
+        ) or 0
+        # demo seeds 4 stories; the Acceptance-Test-Required=False one is excluded
+        assert len(coverage_svc._stories(s)) == total_raw - 1
+
+
+def test_automated_stories_missing_ac_detected(seeded):
+    with SessionLocal() as s:
+        missing = coverage_svc.automated_stories_missing_ac(s)
+        assert missing["count"] == 0
+        for item in missing["items"]:
+            assert item["azure_id"]
+
+
+def test_resolution_distribution_structure(seeded):
+    with SessionLocal() as s:
+        data = defects_svc.resolution_distribution(s)
+        assert set(data) == {"count", "distribution", "stats", "slowest", "over_7d_pct"}
+        assert data["count"] > 0
+        assert len(data["distribution"]) == 6
+        assert sum(b["count"] for b in data["distribution"]) == data["count"]
+        assert data["stats"]["count"] == data["count"]
+        assert len(data["slowest"]) <= 5
+        assert 0 <= data["over_7d_pct"] <= 100
+        assert data["stats"]["p50_hours"] <= data["stats"]["p95_hours"]
+
+
+def test_open_aging_structure(seeded):
+    with SessionLocal() as s:
+        data = defects_svc.open_aging(s)
+        assert set(data) == {"open", "buckets", "oldest", "over_7d", "over_7d_pct"}
+        assert len(data["buckets"]) == 4
+        assert sum(b["count"] for b in data["buckets"]) == data["open"]
+        assert 0 <= data["over_7d_pct"] <= 100
+
+
+def test_dashboard_payload_has_resolution_capacity_and_pain_points(seeded):
+    from app.services import dashboard as dashboard_svc
+
+    with SessionLocal() as s:
+        summary = dashboard_svc.summary(s)
+        assert "defect_resolution" in summary
+        assert "open_defect_aging" in summary
+        assert "capacity" in summary
+        assert "missing_ac_stories" in summary
+        assert "pain_points" in summary
+        assert summary["pain_points"]
+        assert "defect_trend" not in summary
+        for point in summary["pain_points"]:
+            assert point["level"] in ("critical", "warning", "info")
+            assert point["title"] and point["detail"]

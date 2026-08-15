@@ -174,6 +174,12 @@ class AzureDevOpsClient(AzureClientBase):
         closed = settings.azure_closed_date_field.strip()
         if closed and closed not in base:
             base.append(closed)
+        automation = settings.azure_automation_status_field.strip()
+        if automation and automation not in base:
+            base.append(automation)
+        ac_required = settings.azure_acceptance_test_required_field.strip()
+        if ac_required and ac_required not in base:
+            base.append(ac_required)
         return base
 
     async def get_work_item(self, work_item_id: int) -> dict[str, Any]:

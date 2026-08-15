@@ -109,9 +109,95 @@ def resolution_times(session: Session) -> dict[str, Any]:
     if not hours:
         return {"count": 0, "avg_hours": None, "p50_hours": None, "p95_hours": None}
     hours.sort()
+    import math
+
+    def pct(idx_frac: float) -> float:
+        return hours[min(len(hours) - 1, max(0, int(math.ceil(len(hours) * idx_frac)) - 1))]
+
     return {
         "count": len(hours),
         "avg_hours": round(sum(hours) / len(hours), 1),
-        "p50_hours": hours[len(hours) // 2],
-        "p95_hours": hours[int(len(hours) * 0.95) - 1] if len(hours) > 1 else hours[-1],
+        "p50_hours": pct(0.5),
+        "p95_hours": pct(0.95),
+    }
+
+
+_RESOLUTION_BUCKETS = (
+    ("< 1 day", 0, 24),
+    ("1 - 3 days", 24, 72),
+    ("3 - 7 days", 72, 168),
+    ("7 - 14 days", 168, 336),
+    ("14 - 30 days", 336, 720),
+    ("> 30 days", 720, None),
+)
+
+
+def resolution_distribution(session: Session) -> dict[str, Any]:
+    """How long defects take to be resolved — the distribution plus aggregate
+    stats. Highlights the pain point when defects wait on development."""
+    resolved = [d for d in session.scalars(select(Defect)) if d.state in _CLOSED_STATES]
+    buckets = [{"label": label, "min_hours": lo, "count": 0} for label, lo, _ in _RESOLUTION_BUCKETS]
+    hours: list[float] = []
+    slowest: list[dict[str, Any]] = []
+    for d in resolved:
+        if not (d.created_at and d.resolved_at):
+            continue
+        h = (d.resolved_at - d.created_at).total_seconds() / 3600
+        hours.append(h)
+        for bucket in buckets:
+            lo = bucket["min_hours"]
+            hi = next((b[2] for b in _RESOLUTION_BUCKETS if b[0] == bucket["label"]), None)
+            if (hi is None or h < hi) and h >= lo:
+                bucket["count"] += 1
+                break
+        if len(slowest) < 5 or h > slowest[-1]["hours"]:
+            slowest.append(
+                {"azure_id": d.azure_id, "title": d.title[:120],
+                 "hours": round(h, 1), "days": round(h / 24, 1),
+                 "assigned_to": d.assigned_to, "state": d.state}
+            )
+            slowest.sort(key=lambda x: x["hours"], reverse=True)
+            slowest = slowest[:5]
+    stats = resolution_times(session)
+    return {
+        "count": len(hours),
+        "distribution": buckets,
+        "stats": stats,
+        "slowest": slowest,
+        "over_7d_pct": round(
+            sum(1 for h in hours if h >= 168) / max(len(hours), 1) * 100, 1
+        ),
+    }
+
+
+def open_aging(session: Session) -> dict[str, Any]:
+    """Age of currently open defects — the 'waiting on dev' signal."""
+    now = datetime.now(timezone.utc)
+    open_defects = [d for d in session.scalars(select(Defect)) if d.state in _OPEN_STATES]
+    buckets = [
+        {"label": "< 1 week", "count": 0},
+        {"label": "1 - 2 weeks", "count": 0},
+        {"label": "2 - 4 weeks", "count": 0},
+        {"label": "> 1 month", "count": 0},
+    ]
+    oldest: dict[str, Any] | None = None
+    for d in open_defects:
+        if not d.created_at:
+            continue
+        days = (now - d.created_at).total_seconds() / 86400
+        idx = 0 if days < 7 else 1 if days < 14 else 2 if days < 30 else 3
+        buckets[idx]["count"] += 1
+        if oldest is None or days > oldest["days"]:
+            oldest = {
+                "azure_id": d.azure_id, "title": d.title[:120], "days": round(days, 1),
+                "severity": d.severity, "assigned_to": d.assigned_to,
+            }
+    return {
+        "open": len(open_defects),
+        "buckets": buckets,
+        "oldest": oldest,
+        "over_7d": sum(b["count"] for b in buckets[1:]),
+        "over_7d_pct": round(
+            sum(b["count"] for b in buckets[1:]) / max(len(open_defects), 1) * 100, 1
+        ),
     }

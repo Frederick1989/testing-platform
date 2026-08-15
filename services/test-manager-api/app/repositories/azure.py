@@ -185,3 +185,27 @@ def types_for_query(*, stories_only: bool = False) -> list[str]:
     }
     types.update(t for t in settings.azure_defect_types.split(",") if t.strip())
     return sorted(types)
+
+
+# --- automation / test-effort classification -----------------------------
+
+def acceptance_test_required(story: WorkItem) -> bool:
+    """True when a story must deliver test output (AC coverage applies).
+
+    Driven by the 'Acceptance Test Required' boolean custom field: False marks
+    non-test effort (e.g. environment setup) that is excluded from coverage;
+    empty/unset defaults to True so only explicit opt-outs are excluded."""
+    return bool(story.acceptance_test_required is not False)
+
+
+def automation_status(story: WorkItem) -> str:
+    """'automated' or 'manual'. Absent/empty values default to manual so that
+    explicit 'Automated' tagging is required to count as automated."""
+    from app.config import settings
+
+    value = (story.automation_status or "").strip().lower()
+    if not value:
+        return "manual"
+    if value == settings.azure_automation_automated_value.strip().lower():
+        return "automated"
+    return "manual"

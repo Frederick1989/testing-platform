@@ -65,6 +65,10 @@ class WorkItem(Base):
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     tags: Mapped[list[str]] = mapped_column(SafeJSON, nullable=False, default=list)
+    automation_status: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    acceptance_test_required: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True
+    )
     url: Mapped[str] = mapped_column(String(512), nullable=False, default="")
     parent_azure_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     comment_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
